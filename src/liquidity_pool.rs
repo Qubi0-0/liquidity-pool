@@ -51,7 +51,15 @@ impl LpPool {
         min_fee: Percentage,
         max_fee: Percentage,
     ) -> Result<Self, Error> {
-        todo!()
+        Ok(LpPool {
+            price,
+            token_amount,
+            st_token_amount,
+            lp_token_amount,
+            liquidity_target,
+            min_fee,
+            max_fee,
+        })
     }
 
     /// Adds liquidity to the pool.
@@ -63,10 +71,7 @@ impl LpPool {
     /// # Returns
     ///
     /// A result containing the amount of LP tokens received or an error.
-    pub fn add_liquidity(
-        &mut self,
-        token_amount: TokenAmount,
-    ) -> Result<LpTokenAmount, Error> {
+    pub fn add_liquidity(&mut self, token_amount: TokenAmount) -> Result<LpTokenAmount, Error> {
         todo!()
     }
 
@@ -95,10 +100,9 @@ impl LpPool {
     /// # Returns
     ///
     /// A result containing the amount of tokens received or an error.
-    pub fn swap(
-        &mut self,
-        staked_token_amount: StakedTokenAmount,
-    ) -> Result<TokenAmount, Error> {
+    pub fn swap(&mut self, staked_token_amount: StakedTokenAmount) -> Result<TokenAmount, Error> {
         todo!()
     }
 }
+
+
