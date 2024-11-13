@@ -1,3 +1,3 @@
-fn main() {
-    println!("Hello, world!");
-}
+mod liquidity_pool;
+
+pub fn main() {}
