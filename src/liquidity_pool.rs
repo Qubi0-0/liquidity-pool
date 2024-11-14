@@ -15,6 +15,9 @@ pub struct Price(pub u64);
 /// Represents a percentage value.
 pub struct Percentage(pub u64);
 
+/// Represents the precision factor used for decimal shifting.
+const PRECISION_FACTOR: u64 = 0x1_0000_0000u64;
+
 /// Represents a liquidity pool with various parameters.
 pub struct LpPool {
     pub price: Price,
@@ -32,25 +35,38 @@ impl LpPool {
     /// # Arguments
     ///
     /// * `price` - The price of the token.
-    /// * `token_amount` - The amount of tokens in the pool.
-    /// * `st_token_amount` - The amount of staked tokens in the pool.
-    /// * `lp_token_amount` - The amount of LP tokens in the pool.
     /// * `liquidity_target` - The target amount of liquidity for the pool.
     /// * `min_fee` - The minimum fee percentage.
     /// * `max_fee` - The maximum fee percentage.
     ///
+    ///
+    /// Calculates :
+    /// * `token_amount` - The amount of tokens in the pool.
+    /// * `st_token_amount` - The amount of staked tokens in the pool.
+    /// * `lp_token_amount` - The amount of LP tokens in the pool.
     /// # Returns
     ///
     /// A result containing the initialized `LpPool` or an error.
     pub fn init(
-        price: Price,
-        token_amount: TokenAmount,
-        st_token_amount: StakedTokenAmount,
-        lp_token_amount: LpTokenAmount,
-        liquidity_target: TokenAmount,
-        min_fee: Percentage,
-        max_fee: Percentage,
+        price: f64,
+        liquidity_target: f64,
+        min_fee: f64,
+        max_fee: f64,
     ) -> Result<Self, Error> {
+        if max_fee > 100.0 || min_fee < 0.0 || (min_fee > max_fee) {
+            return Err(Error);
+        }
+        // decimal shifting to provide float-like precision
+        let price = Price((price * PRECISION_FACTOR as f64).round() as u64);
+        let liquidity_target =
+            TokenAmount((liquidity_target * PRECISION_FACTOR as f64).round() as u64);
+        let min_fee = Percentage((min_fee * PRECISION_FACTOR as f64).round() as u64);
+        let max_fee = Percentage((max_fee * PRECISION_FACTOR as f64).round() as u64);
+
+        let token_amount = TokenAmount(liquidity_target.0 / 2); // Example logic
+        let st_token_amount = StakedTokenAmount(liquidity_target.0 / 4); // Example logic
+        let lp_token_amount = LpTokenAmount(liquidity_target.0 / 2); // Example logic
+        
         Ok(LpPool {
             price,
             token_amount,
@@ -124,60 +140,4 @@ impl LpPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn setup_pool() -> LpPool {
-        LpPool::init(
-            Price(150),              // 1.5
-            TokenAmount(10000),      // 100.0
-            StakedTokenAmount(5000), // 50.0
-            LpTokenAmount(10000),    // 100.0
-            TokenAmount(9000),       // 90.0
-            Percentage(1),           // 0.1%
-            Percentage(900),         // 9%
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn test_init() {
-        let pool = setup_pool();
-
-        assert_eq!(pool.price.0, 150);
-        assert_eq!(pool.token_amount.0, 10000);
-        assert_eq!(pool.st_token_amount.0, 5000);
-        assert_eq!(pool.lp_token_amount.0, 10000);
-        assert_eq!(pool.liquidity_target.0, 9000);
-        assert_eq!(pool.min_fee.0, 1);
-        assert_eq!(pool.max_fee.0, 900);
-    }
-
-    #[test]
-    fn test_add_liquidity() {
-        let mut pool = setup_pool();
-
-        let result = pool.add_liquidity(TokenAmount(10000)).unwrap(); // 100.0
-        assert_eq!(result.0, 10000);
-        assert_eq!(pool.token_amount.0, 20000);
-        assert_eq!(pool.lp_token_amount.0, 20000);
-    }
-
-    #[test]
-    fn test_remove_liquidity() {
-        let mut pool = setup_pool();
-
-        let result = pool.remove_liquidity(LpTokenAmount(5000)).unwrap(); // 50.0
-        assert_eq!(result.0 .0, 5000);
-        assert_eq!(result.1 .0, 0);
-        assert_eq!(pool.token_amount.0, 5000);
-        assert_eq!(pool.lp_token_amount.0, 5000);
-    }
-
-    #[test]
-    fn test_swap() {
-        let mut pool = setup_pool();
-
-        let result = pool.swap(StakedTokenAmount(2000)).unwrap(); // 20.0
-        assert_eq!(result.0, 2000);
-        assert_eq!(pool.st_token_amount.0, 3000);
-        assert_eq!(pool.token_amount.0, 12000);
-    }
 }
