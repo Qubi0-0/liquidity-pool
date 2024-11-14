@@ -72,7 +72,10 @@ impl LpPool {
     ///
     /// A result containing the amount of LP tokens received or an error.
     pub fn add_liquidity(&mut self, token_amount: TokenAmount) -> Result<LpTokenAmount, Error> {
-        todo!()
+        self.token_amount.0 += token_amount.0;
+        let lp_token_recevied = LpTokenAmount(token_amount.0);
+        self.lp_token_amount.0 += lp_token_recevied.0;
+        Ok(lp_token_recevied)
     }
 
     /// Removes liquidity from the pool.
@@ -105,4 +108,48 @@ impl LpPool {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
 
+    #[test]
+    fn test_init() {
+        let pool = LpPool::init(
+            Price(150), // Assuming price is represented as an integer with 2 decimal places
+            TokenAmount(1000),
+            StakedTokenAmount(500),
+            LpTokenAmount(100),
+            TokenAmount(9000), // Assuming liquidity_target is represented as an integer with 2 decimal places
+            Percentage(1), // Assuming min_fee is represented as an integer with 1 decimal place
+            Percentage(90), // Assuming max_fee is represented as an integer with 1 decimal place
+        )
+        .unwrap();
+
+        assert_eq!(pool.price.0, 150);
+        assert_eq!(pool.token_amount.0, 1000);
+        assert_eq!(pool.st_token_amount.0, 500);
+        assert_eq!(pool.lp_token_amount.0, 100);
+        assert_eq!(pool.liquidity_target.0, 9000);
+        assert_eq!(pool.min_fee.0, 1);
+        assert_eq!(pool.max_fee.0, 90);
+    }
+
+    #[test]
+    fn test_add_liquidity() {
+        let mut pool = LpPool::init(
+            Price(150), // Assuming price is represented as an integer with 2 decimal places
+            TokenAmount(1000),
+            StakedTokenAmount(500),
+            LpTokenAmount(100),
+            TokenAmount(9000), // Assuming liquidity_target is represented as an integer with 2 decimal places
+            Percentage(1), // Assuming min_fee is represented as an integer with 1 decimal place
+            Percentage(90), // Assuming max_fee is represented as an integer with 1 decimal place
+        )
+        .unwrap();
+
+        let result = pool.add_liquidity(TokenAmount(10000)).unwrap(); // Assuming token_amount is represented as an integer with 2 decimal places
+        assert_eq!(result.0, 10000);
+        assert_eq!(pool.token_amount.0, 11000);
+        assert_eq!(pool.lp_token_amount.0, 10100);
+    }
+}
