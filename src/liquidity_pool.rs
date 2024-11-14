@@ -87,10 +87,11 @@ impl LpPool {
         let min_fee = Percentage((min_fee * PRECISION_FACTOR as f64).round() as u64);
         let max_fee = Percentage((max_fee * PRECISION_FACTOR as f64).round() as u64);
 
-        let token_amount = TokenAmount(liquidity_target.0 / 2); // Example logic
-        let st_token_amount = StakedTokenAmount(liquidity_target.0 / 4); // Example logic
-        let lp_token_amount = LpTokenAmount(liquidity_target.0 / 2); // Example logic
-        
+        // Example logic to calculate token_amount, st_token_amount, and lp_token_amount
+        let token_amount = TokenAmount(liquidity_target.0);
+        let st_token_amount = StakedTokenAmount(0); // initialising with zero of StakedToken
+        let lp_token_amount = LpTokenAmount(liquidity_target.0); //  1:1 for first transaction
+
         Ok(LpPool {
             price,
             token_amount,
@@ -122,11 +123,16 @@ impl LpPool {
         let tokens_to_add = new_tokens_u64 / 2; // 50% regular tokens
         let staked_tokens_to_add = new_tokens_u64 - tokens_to_add; // Remaining 50% to staked tokens
     
-        self.token_amount.0 += token_amount.0;
-        let lp_token_recevied = LpTokenAmount(token_amount.0);
-        self.lp_token_amount.0 += lp_token_recevied.0;
-        Ok(lp_token_recevied)
+        self.token_amount.0 += tokens_to_add;
+        self.st_token_amount.0 += staked_tokens_to_add;
+    
+        // Issue LP tokens equivalent to the total added tokens
+        let lp_token_received = LpTokenAmount(new_tokens_u64); 
+        self.lp_token_amount.0 += lp_token_received.0;
+    
+        Ok(lp_token_received.0 as f64 / PRECISION_FACTOR as f64)
     }
+    
 
     /// Removes liquidity from the pool.
     ///
@@ -141,13 +147,19 @@ impl LpPool {
         let lp_token_amount_u64 = (lp_token_amount * PRECISION_FACTOR as f64).round() as u64;
         let unstake_fee = self.max_fee.0
             - (self.max_fee.0 - self.min_fee.0) * lp_token_amount_u64 / self.liquidity_target.0;
-        if self.lp_token_amount.0 < lp_token_amount.0 {
+        if self.lp_token_amount.0 < lp_token_amount_u64 {
             return Err(LpPoolError::InsufficientLiquidity);
         }
-        self.lp_token_amount.0 -= lp_token_amount.0;
-        let tokens_received = TokenAmount(lp_token_amount.0); // Simplified logic
-        let staked_tokens_received = StakedTokenAmount(0); // Simplified logic
-        self.token_amount.0 -= tokens_received.0;
+        self.lp_token_amount.0 -= lp_token_amount_u64;
+
+        let tokens_received_u64 = lp_token_amount_u64; // Simplified logic
+        let staked_tokens_received_u64 = 0; // Simplified logic
+
+        self.token_amount.0 -= tokens_received_u64;
+
+        let tokens_received = tokens_received_u64 as f64 / PRECISION_FACTOR as f64;
+        let staked_tokens_received = staked_tokens_received_u64 as f64 / PRECISION_FACTOR as f64;
+
         Ok((tokens_received, staked_tokens_received))
     }
 
@@ -180,9 +192,72 @@ impl LpPool {
     
         Ok(tokens_received_u64 as f64 / PRECISION_FACTOR as f64)
     }
+    
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn setup_pool() -> LpPool {
+        LpPool::init(
+            1.5,  // price
+            90.0, // liquidity_target
+            0.1,  // min_fee
+            9.0,  // max_fee
+        )
+        .unwrap()
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_init() {
+        let pool = setup_pool();
+
+        assert_eq!(pool.price.0, (1.5 * PRECISION_FACTOR as f64).round() as u64);
+        assert_eq!(pool.token_amount.0, (90.0 * PRECISION_FACTOR as f64).round() as u64);
+        assert_eq!(pool.st_token_amount.0, 0);
+        assert_eq!(pool.lp_token_amount.0, (90.0 * PRECISION_FACTOR as f64).round() as u64);
+        assert_eq!(pool.liquidity_target.0, (90.0 * PRECISION_FACTOR as f64).round() as u64);
+        assert_eq!(pool.min_fee.0, (0.1 * PRECISION_FACTOR as f64).round() as u64);
+        assert_eq!(pool.max_fee.0, (9.0 * PRECISION_FACTOR as f64).round() as u64);
+    }
+
+    #[test]
+    fn test_add_liquidity() {
+        let mut pool = setup_pool();
+
+        let lp_tokens = pool.add_liquidity(100.0).unwrap();
+
+        assert_eq!(lp_tokens, 100.0);
+    }
+
+    #[test]
+    fn test_swap_successful() {
+        let mut pool = setup_pool();
+        let _ = pool.add_liquidity(100.0);
+
+        let staked_tokens_to_swap = 6.0;
+        let expected_tokens_received = 8.991; // Expected value based on pool's swap logic.
+        
+        let result = pool.swap(staked_tokens_to_swap).unwrap();
+        
+        assert!((result - expected_tokens_received).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_story_example() {
+        let mut pool = setup_pool();
+        let token_return = pool.add_liquidity(100.0).unwrap();
+        assert_eq!(token_return, 100.0);
+        let swap_return = pool.swap(6.0).unwrap();
+        assert_eq!(swap_return, 8.991);
+        let second_token_return = pool.add_liquidity(10.0).unwrap();
+        assert_eq!(second_token_return, 9.9991);
+        // let second_swap_return = pool.swap(30.0).unwrap();
+        // assert_eq!(second_swap_return, 43.44237);
+        // let (remove_token, staked_token) = pool.remove_liquidity(100.9991).unwrap();
+        // assert_eq!(remove_token, 57.56663);
+        // assert_eq!(staked_token, 36.0);
+    }
 }
