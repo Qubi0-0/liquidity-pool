@@ -15,3 +15,5 @@ After reading Marinade state, you'll have marinade_state.msol_price: u64, and th
 unstake_fee = max_fee - (max_fee - min_fee) \* amount_after / liquidity_target
 
 Price of mSOL = total_staked / tokens_minted <==> Staked_token = Token_amount / Lp_token_amount
+
+lp_tokens_issued= (total_liquidity / user_value) × total_lp_tokens

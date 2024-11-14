@@ -1,5 +1,29 @@
 use std::fmt::Error;
 
+use std::fmt;
+
+#[derive(Debug)]
+pub enum LpPoolError {
+    InvalidFee,
+    InsufficientLiquidity,
+    InsufficientStakedTokens,
+    InvalidTokenAmount,
+}
+
+impl fmt::Display for LpPoolError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LpPoolError::InvalidFee => write!(f, "Invalid fee values provided."),
+            LpPoolError::InsufficientLiquidity => write!(f, "Insufficient liquidity in the pool."),
+            LpPoolError::InsufficientStakedTokens => write!(f, "Insufficient staked tokens in the pool."),
+            LpPoolError::InvalidTokenAmount => write!(f, "Invalid token amount provided."),
+        }
+    }
+}
+
+impl std::error::Error for LpPoolError {}
+
+
 /// Represents an amount of tokens.
 pub struct TokenAmount(pub u64);
 
@@ -52,9 +76,9 @@ impl LpPool {
         liquidity_target: f64,
         min_fee: f64,
         max_fee: f64,
-    ) -> Result<Self, Error> {
-        if max_fee > 100.0 || min_fee < 0.0 || (min_fee > max_fee) {
-            return Err(Error);
+    ) -> Result<Self, LpPoolError> {
+        if max_fee > 100.0 || min_fee < 0.0 || (min_fee > max_fee) || liquidity_target <= 0.0 {
+            return Err(LpPoolError::InvalidFee);
         }
         // decimal shifting to provide float-like precision
         let price = Price((price * PRECISION_FACTOR as f64).round() as u64);
@@ -87,7 +111,17 @@ impl LpPool {
     /// # Returns
     ///
     /// A result containing the amount of LP tokens received or an error.
-    pub fn add_liquidity(&mut self, token_amount: TokenAmount) -> Result<LpTokenAmount, Error> {
+    pub fn add_liquidity(&mut self, token_amount: f64) -> Result<f64, LpPoolError> {
+        let new_tokens_u64 = (token_amount * PRECISION_FACTOR as f64).round() as u64;
+    
+        if token_amount <= 0.0 {
+            return Err(LpPoolError::InvalidTokenAmount);
+        }
+    
+        // Split the added liquidity between token_amount and st_token_amount
+        let tokens_to_add = new_tokens_u64 / 2; // 50% regular tokens
+        let staked_tokens_to_add = new_tokens_u64 - tokens_to_add; // Remaining 50% to staked tokens
+    
         self.token_amount.0 += token_amount.0;
         let lp_token_recevied = LpTokenAmount(token_amount.0);
         self.lp_token_amount.0 += lp_token_recevied.0;
@@ -103,12 +137,12 @@ impl LpPool {
     /// # Returns
     ///
     /// A result containing a tuple with the amount of tokens and staked tokens received or an error.
-    pub fn remove_liquidity(
-        &mut self,
-        lp_token_amount: LpTokenAmount,
-    ) -> Result<(TokenAmount, StakedTokenAmount), Error> {
+    pub fn remove_liquidity(&mut self, lp_token_amount: f64) -> Result<(f64, f64), LpPoolError> {
+        let lp_token_amount_u64 = (lp_token_amount * PRECISION_FACTOR as f64).round() as u64;
+        let unstake_fee = self.max_fee.0
+            - (self.max_fee.0 - self.min_fee.0) * lp_token_amount_u64 / self.liquidity_target.0;
         if self.lp_token_amount.0 < lp_token_amount.0 {
-            return Err(Error);
+            return Err(LpPoolError::InsufficientLiquidity);
         }
         self.lp_token_amount.0 -= lp_token_amount.0;
         let tokens_received = TokenAmount(lp_token_amount.0); // Simplified logic
@@ -126,14 +160,25 @@ impl LpPool {
     /// # Returns
     ///
     /// A result containing the amount of tokens received or an error.
-    pub fn swap(&mut self, staked_token_amount: StakedTokenAmount) -> Result<TokenAmount, Error> {
-        if staked_token_amount.0 > self.st_token_amount.0 {
-            return Err(Error);
+    pub fn swap(&mut self, staked_token_amount: f64) -> Result<f64, LpPoolError> {
+        if staked_token_amount <= 0.0 {
+            return Err(LpPoolError::InvalidTokenAmount);
         }
-        self.st_token_amount.0 -= staked_token_amount.0;
-        let tokens_received = TokenAmount(staked_token_amount.0); // Simplified logic
-        self.token_amount.0 += tokens_received.0;
-        Ok(tokens_received)
+    
+        let staked_token_u64 =
+            StakedTokenAmount((staked_token_amount * PRECISION_FACTOR as f64).round() as u64);
+    
+        if staked_token_u64.0 > self.st_token_amount.0 {
+            return Err(LpPoolError::InsufficientStakedTokens);
+        }
+    
+        let swap_ratio = self.price.0 as f64 / PRECISION_FACTOR as f64;
+        let tokens_received_u64 = ((staked_token_u64.0 as f64 * swap_ratio) * PRECISION_FACTOR as f64).round() as u64 / PRECISION_FACTOR;
+    
+        self.st_token_amount.0 -= staked_token_u64.0;
+        self.token_amount.0 += tokens_received_u64;
+    
+        Ok(tokens_received_u64 as f64 / PRECISION_FACTOR as f64)
     }
 }
 
