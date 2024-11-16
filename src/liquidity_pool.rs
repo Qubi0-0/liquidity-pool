@@ -115,24 +115,34 @@ impl LpPool {
     /// A result containing the amount of LP tokens received or an error.
     pub fn add_liquidity(&mut self, token_amount: f64) -> Result<f64, LpPoolError> {
         let new_tokens_u64 = (token_amount * PRECISION_FACTOR as f64).round() as u64;
-
+    
         if token_amount <= 0.0 {
             return Err(LpPoolError::InvalidTokenAmount);
         }
-
+    
         // Split the added liquidity between token_amount and st_token_amount
         let tokens_to_add = new_tokens_u64 / 2; // 50% regular tokens
         let staked_tokens_to_add = new_tokens_u64 - tokens_to_add; // Remaining 50% to staked tokens
-
+    
+        let token_sum = self.token_amount.0 + self.st_token_amount.0;
+        let lp_token_received = if token_sum > 0 {
+            // Calculate LP tokens using u128 to prevent overflow
+            let lp_tokens = (new_tokens_u64 as u128 * self.lp_token_amount.0 as u128) / token_sum as u128;
+            lp_tokens as u64
+        } else {
+            // Initial liquidity
+            new_tokens_u64
+        };
+    
         self.token_amount.0 += tokens_to_add;
         self.st_token_amount.0 += staked_tokens_to_add;
-
+    
         // Issue LP tokens equivalent to the total added tokens
-        let lp_token_received = LpTokenAmount(new_tokens_u64);
-        self.lp_token_amount.0 += lp_token_received.0;
-
-        Ok(lp_token_received.0 as f64 / PRECISION_FACTOR as f64)
+        self.lp_token_amount.0 += lp_token_received;
+    
+        Ok(lp_token_received as f64 / PRECISION_FACTOR as f64)
     }
+    
 
     /// Removes liquidity from the pool.
     ///
