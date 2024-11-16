@@ -41,7 +41,7 @@ pub struct Price(pub u64);
 pub struct Percentage(pub u64);
 
 /// Represents the precision factor used for decimal shifting.
-const PRECISION_FACTOR: u64 = 0x1_0000_0000u64;
+const PRECISION_FACTOR: u64 = 1_000_000_u64;
 
 /// Represents a liquidity pool with various parameters.
 pub struct LpPool {
@@ -192,20 +192,32 @@ impl LpPool {
 
         let left_staked_tokens = self.st_token_amount.0 - staked_token_u64.0;
 
-        let fee = 0.01
-            * (self.max_fee.0
-                - (self.max_fee.0 - self.min_fee.0) / self.liquidity_target.0 * left_staked_tokens)
-                as f64
-            / PRECISION_FACTOR as f64;
+        println!("Left tokens: {}", left_staked_tokens);
+
         if staked_token_u64.0 > self.st_token_amount.0 {
             return Err(LpPoolError::InsufficientStakedTokens);
         }
 
-        let swap_ratio = self.price.0 as f64 / PRECISION_FACTOR as f64;
-        let tokens_received_u64 = (staked_token_u64.0 as f64 * swap_ratio * (1.0 - fee)) as u64;
+        #[rustfmt::skip]
+        let mut fee = self.max_fee.0 - (self.max_fee.0 - self.min_fee.0) * left_staked_tokens / self.liquidity_target.0;
+
+        fee = fee.clamp(self.min_fee.0, self.max_fee.0);
+
+        println!("precision factor: {}", PRECISION_FACTOR);
+        println!("fee: {}", fee);
+        println!("min fee: {}", self.min_fee.0);
+        println!("max fee: {}", self.max_fee.0);
+        println!("St Tokens: {}", staked_token_u64.0);
+        println!("Price: {}", self.price.0);
+
+        let precision_adjusted_fee = PRECISION_FACTOR - fee;
+
+        let tokens_received_u64 =
+            ((staked_token_u64.0 as u128 * self.price.0 as u128 * precision_adjusted_fee as u128)
+                / (PRECISION_FACTOR as u128 * PRECISION_FACTOR as u128)) as u128;
 
         self.st_token_amount.0 -= staked_token_u64.0;
-        self.token_amount.0 += tokens_received_u64;
+        self.token_amount.0 += tokens_received_u64 as u64;
 
         Ok(tokens_received_u64 as f64 / PRECISION_FACTOR as f64)
     }
