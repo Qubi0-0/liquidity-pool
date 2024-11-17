@@ -33,13 +33,13 @@ Code was prepared for easy start for further documentations with use of `cargo d
 ## Unit Tests
 
 The module includes unit tests to verify the functionality of the LpPool methods.
-This module provides a basic implementation of a liquidity pool with functionalities to add, remove, and swap liquidity, along with error handling and precision management. Repo itself run test while merging to main, to make sure everything works (It does not for now :D ).
+This module provides a basic implementation of a liquidity pool with functionalities to add, remove, and swap liquidity, along with error handling and precision management. Repo itself run test while merging to main, to make sure everything works (It propably will not pass test anyway).
 
 # Progress
 
 Despite the efforts, understanding how liquidity pools actually work is still vague and for that reason hard to implement robustly. For now, the biggest problem is to comprehend how the amount of tokens to staked tokens should be adjusted.
 
-The liquidity pool does not involve two actors: the `Swapper` and the `Liquidity Provider` due to ongoing problems with the liquidity pool itself.
+The liquidity pool implementation does not involve two actors: the `Swapper` and the `Liquidity Provider` due to ongoing problems with the liquidity pool itself.
 
 ## Comments
 
