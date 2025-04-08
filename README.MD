@@ -40,8 +40,3 @@ This module provides a basic implementation of a liquidity pool with functionali
 Despite the efforts, understanding how liquidity pools actually work is still vague and for that reason hard to implement robustly. For now, the biggest problem is to comprehend how the amount of tokens to staked tokens should be adjusted.
 
 The liquidity pool implementation does not involve two actors: the `Swapper` and the `Liquidity Provider` due to ongoing problems with the liquidity pool itself.
-
-## Comments
-
-Although for now I do not feel I will be able to accomplish the task in a full manner, I still appreciate the new bit of knowledge I learned such as `Proof of Stake` or `Liquidity Pool`.
-Now I feel that the crypto world is actually much more interesting than I first anticipated.
